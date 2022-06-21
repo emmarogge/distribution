@@ -1,5 +1,5 @@
-FROM ubuntu:16.04
-
+FROM ubuntu:20.04
+ENV DEBIAN_FRONTEND=noninteractive
 ARG version=4.2.0
 
 # Install CellProfiler dependencies
@@ -26,11 +26,31 @@ RUN wget https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-16.04/wx
 RUN python3.8 -m pip install wxPython-4.1.0-cp38-cp38-linux_x86_64.whl
 RUN rm wxPython-4.1.0-cp38-cp38-linux_x86_64.whl
 
+RUN  apt-get -yq update && \
+     apt-get -yqq install ssh && \
+     apt-get install -y git
+
+# Copy SSH credentials to access GitHub
+RUN mkdir -p ~/.ssh && \
+    chmod 0700 ~/.ssh && \
+    ssh-keyscan github.com > ~/.ssh/known_hosts
+
+# Do some linux magic to format the key properly.
+RUN echo $github_private_key > ~/.ssh/original
+RUN sed -i 's/ /\n/g' ~/.ssh/original
+RUN sed -i '1,4d' ~/.ssh/original
+RUN tac ~/.ssh/original | sed '1,4d' | tac > ~/.ssh/temp
+RUN echo "-----BEGIN RSA PRIVATE KEY-----" > ~/.ssh/id_rsa
+RUN cat ~/.ssh/temp >> ~/.ssh/id_rsa
+RUN echo "-----END RSA PRIVATE KEY-----" >> ~/.ssh/id_rsa
+RUN chmod 600 ~/.ssh/id_rsa
+
 # Install CellProfiler
 RUN python3.8 -m pip install numpy cython
-RUN python3.8 -m pip install cellprofiler==$version
+RUN python3.8 -m pip install git+https://github.com/emmarogge/core.git@issues/4547
+RUN python3.8 -m pip install -e cellprofiler==$version
 
 WORKDIR /usr/local/src
 ENTRYPOINT ["cellprofiler"]
 
-CMD ["--run", "--run-headless", "--help"]
+CMD ["--version"]
